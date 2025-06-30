@@ -33,6 +33,7 @@ export default class InstallationManager {
           useBuiltinPython: config.get('useBuiltinPython'),
           useBuiltinPIOCore: config.get('useBuiltinPIOCore'),
           useDevelopmentPIOCore: config.get('useDevelopmentPIOCore'),
+          customPIOCoreRepository: config.get('customPIOCoreRepository'),
           pythonPrompt: new PythonPrompt(),
           disableAutoUpdates: disableAutoUpdates,
           predownloadedPackageDir: path.join(

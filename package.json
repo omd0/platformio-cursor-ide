@@ -196,6 +196,16 @@
         "enablement": "pioProjectTasksReady"
       },
       {
+        "command": "platformio-ide.switchCppToolchain",
+        "title": "Switch C++ Toolchain",
+        "category": "PlatformIO"
+      },
+      {
+        "command": "platformio-ide.setCustomPIOCoreRepository",
+        "title": "Set Custom PlatformIO Core Repository",
+        "category": "PlatformIO"
+      },
+      {
         "command": "platformio-ide.startDebugging",
         "title": "Start Debugging",
         "category": "PlatformIO",
@@ -696,9 +706,7 @@
         }
       }
     ],
-    "configurationDefaults": {
-      "C_Cpp.debugShortcut": false
-    },
+
     "configuration": {
       "type": "object",
       "title": "PlatformIO IDE",
@@ -722,6 +730,11 @@
           "type": "boolean",
           "default": true,
           "description": "Automatically rebuild the project IntelliSense index when platformio.ini is changed or when new libraries are installed"
+        },
+        "platformio-ide.autoSetupCppToolchain": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically setup C++ IntelliSense based on platformio.ini configuration"
         },
         "platformio-ide.showEditorTitleShortcuts": {
           "type": "boolean",
@@ -761,6 +774,14 @@
           "type": "boolean",
           "default": false,
           "description": "Use a development version of PlatformIO Core"
+        },
+        "platformio-ide.customPIOCoreRepository": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null,
+          "description": "Custom Git repository URL for PlatformIO Core (e.g., 'https://github.com/yourusername/platformio-core.git#branch'). Leave empty to use the official repository."
         },
         "platformio-ide.disablePIOHomeStartup": {
           "type": "boolean",
@@ -905,6 +926,8 @@
     "webpack-cli": "~6.0.1"
   },
   "extensionDependencies": [
-    "ms-vscode.cpptools"
+    "llvm-vs-code-extensions.vscode-clangd",
+    "ms-vscode.cmake-tools",
+    "vadimcn.vscode-lldb"
   ]
 }
