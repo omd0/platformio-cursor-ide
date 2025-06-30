@@ -6,7 +6,7 @@
  * the root directory of this source tree.
  */
 
-import { CONFLICTED_EXTENSION_IDS } from './constants';
+import { CONFLICTED_EXTENSION_IDS, REQUIRED_EXTENSION_IDS, CPP_TOOLCHAIN_EXTENSIONS } from './constants';
 import { extension } from './main';
 import vscode from 'vscode';
 
@@ -54,6 +54,95 @@ export async function maybeRateExtension() {
   extension.context.globalState.update(stateKey, state);
 }
 
+export async function checkRequiredExtensions() {
+  const missing = REQUIRED_EXTENSION_IDS.filter(
+    (id) => !vscode.extensions.all.find((ext) => ext.id === id),
+  );
+  
+  if (missing.length === 0) {
+    return;
+  }
+  
+  const selectedItem = await vscode.window.showWarningMessage(
+    `Required extensions for the modern PlatformIO toolchain are missing (${missing.join(', ')}). ` +
+      'These extensions are needed for IntelliSense, build system, and debugging functionality.',
+    { title: 'Install missing extensions', isCloseAffordance: false },
+    { title: 'More details', isCloseAffordance: false },
+    { title: 'Remind later', isCloseAffordance: true },
+  );
+  
+  switch (selectedItem ? selectedItem.title : undefined) {
+    case 'Install missing extensions':
+      for (const extensionId of missing) {
+        await vscode.commands.executeCommand(
+          'workbench.extensions.installExtension',
+          extensionId,
+        );
+      }
+      vscode.commands.executeCommand('workbench.action.reloadWindow');
+      break;
+    case 'More details':
+      vscode.commands.executeCommand(
+        'vscode.open',
+        vscode.Uri.parse('https://docs.platformio.org/en/latest/integration/ide/vscode.html#modern-toolchain'),
+      );
+      break;
+  }
+}
+
+export async function handleCppToolchainSetup(toolchain = 'ms-vscode.cpptools') {
+  // Recommend appropriate extension
+  const targetExtension = toolchain;
+  const extension = vscode.extensions.getExtension(targetExtension);
+  
+  if (!extension) {
+    const displayName = toolchain === 'anysphere.cpptools' ? 'anysphere C++ Tools' : 'Microsoft C/C++ Tools';
+    const action = await vscode.window.showInformationMessage(
+      `${displayName} extension is required for C++ IntelliSense. Install it?`,
+      'Install', 'Later'
+    );
+
+    if (action === 'Install') {
+      await vscode.commands.executeCommand(
+        'workbench.extensions.installExtension', 
+        targetExtension
+      );
+      vscode.commands.executeCommand('workbench.action.reloadWindow');
+    }
+    return;
+  }
+
+  // Handle conflicting extensions - warn if multiple C++ extensions are active
+  const activeCppExtensions = CPP_TOOLCHAIN_EXTENSIONS.filter(
+    (id) => {
+      const ext = vscode.extensions.getExtension(id);
+      return ext && ext.isActive;
+    }
+  );
+
+  if (activeCppExtensions.length > 1) {
+    const conflictingExtensions = activeCppExtensions.filter(id => id !== toolchain);
+    
+    if (conflictingExtensions.length > 0) {
+      const action = await vscode.window.showWarningMessage(
+        `Multiple C++ extensions are active (${activeCppExtensions.join(', ')}). ` +
+          `This may cause conflicts. Disable ${conflictingExtensions.join(', ')}?`,
+        'Disable Others', 'Keep All'
+      );
+
+      if (action === 'Disable Others') {
+        for (const conflictingId of conflictingExtensions) {
+          await vscode.commands.executeCommand(
+            'workbench.extensions.disableWorkspace', 
+            conflictingId
+          );
+        }
+        vscode.commands.executeCommand('workbench.action.reloadWindow');
+      }
+    }
+  }
+}
+
 export async function warnAboutConflictedExtensions() {
   const conflicted = vscode.extensions.all.filter(
     (ext) => ext.isActive && CONFLICTED_EXTENSION_IDS.includes(ext.id),
@@ -62,7 +151,7 @@ export async function warnAboutConflictedExtensions() {
     return;
   }
   const selectedItem = await vscode.window.showWarningMessage(
-    `Conflicted extensions with IntelliSense service were detected (${conflicted
+    `Conflicted extensions with the modern PlatformIO toolchain were detected (${conflicted
       .map((ext) => ext.packageJSON.displayName || ext.id)
       .join(', ')}). ` +
       'Code-completion, linting and navigation will not work properly. ' +
@@ -75,7 +164,7 @@ export async function warnAboutConflictedExtensions() {
     case 'More details':
       vscode.commands.executeCommand(
         'vscode.open',
-        vscode.Uri.parse('http://bit.ly/pio-vscode-conflicted-extensions'),
+        vscode.Uri.parse('https://docs.platformio.org/en/latest/integration/ide/vscode.html#modern-toolchain'),
       );
       break;
     case 'Uninstall conflicted':
@@ -103,7 +192,7 @@ export async function warnAboutInoFile(editor) {
   }
 
   const selectedItem = await vscode.window.showWarningMessage(
-    'C/C++ IntelliSense service does not support .INO files. ' +
+    'The clangd language server does not support .INO files. ' +
       'It might lead to the spurious problems with code completion, linting, and debugging. ' +
       'Please convert .INO sketch into the valid .CPP file.',
     { title: 'Show instruction', isCloseAffordance: false },

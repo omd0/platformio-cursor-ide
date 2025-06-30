@@ -5,3 +5,8 @@ yarn.lock
 package-lock.json
 *.dict
 .vscode/settings.json
+IntelliSense_vs_CPPTools_Implementation.md
+Migration_to_clangd_Plan.md
+Modern_Toolchain_Integration.md
+platformio_ide_changes.md
+.cursor/rules/refactor-code.mdc

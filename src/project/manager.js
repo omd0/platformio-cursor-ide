@@ -17,6 +17,7 @@ import { STATUS_BAR_PRIORITY_START } from '../constants';
 import { extension } from '../main';
 import path from 'path';
 import vscode from 'vscode';
+import fs from 'fs';
 
 export default class ProjectManager {
   CONFIG_CHANGED_DELAY = 3; // seconds
@@ -121,6 +122,10 @@ export default class ProjectManager {
       vscode.commands.registerCommand(
         'platformio-ide.activeEnvironment',
         async () => await this._pool.getActiveObserver().revealActiveEnvironment(),
+      ),
+      vscode.commands.registerCommand(
+        'platformio-ide.switchCppToolchain',
+        async () => await this.switchCppToolchain(),
       ),
     ];
     this.internalSubscriptions = [];
@@ -313,5 +318,97 @@ export default class ProjectManager {
       return;
     }
     this.switchToProject(pickedItem.projectDir, { env: pickedItem.env, force: true });
+  }
+
+  async switchCppToolchain() {
+    const toolchains = [
+      { 
+        label: 'Microsoft C/C++ Tools', 
+        value: 'ms-vscode.cpptools',
+        description: 'Traditional Microsoft C++ extension'
+      },
+      { 
+        label: 'anysphere C++ Tools', 
+        value: 'anysphere.cpptools',
+        description: 'Modern C++ language server'
+      }
+    ];
+    
+    const selected = await vscode.window.showQuickPick(toolchains, {
+      placeHolder: 'Select C++ toolchain for IntelliSense'
+    });
+
+    if (selected) {
+      const activeProjectDir = this.findActiveProjectDir();
+      if (!activeProjectDir) {
+        vscode.window.showErrorMessage('No active PlatformIO project found');
+        return;
+      }
+
+      // Update platformio.ini with selected toolchain
+      await this.updatePlatformIOConfig(activeProjectDir, 'vscode_cpp_toolchain', selected.value);
+      
+      // Setup the selected toolchain
+      const misc = await import('../misc.js');
+      await misc.handleCppToolchainSetup(selected.value);
+      
+      // Trigger project reconfiguration
+      await this.switchToProject(activeProjectDir, { force: true });
+      
+      vscode.window.showInformationMessage(
+        `Switched to ${selected.label}. Project configuration updated.`
+      );
+    }
+  }
+
+  async updatePlatformIOConfig(projectDir, key, value) {
+    const configPath = path.join(projectDir, 'platformio.ini');
+    try {
+      let content = fs.readFileSync(configPath, 'utf8');
+      
+      // Simple approach: look for [platformio] section and add/update the key
+      const lines = content.split('\n');
+      let platformioSectionIndex = -1;
+      let keyIndex = -1;
+      
+      // Find [platformio] section
+      for (let i = 0; i < lines.length; i++) {
+        if (lines[i].trim() === '[platformio]') {
+          platformioSectionIndex = i;
+          break;
+        }
+      }
+      
+      // If no [platformio] section, add it at the beginning
+      if (platformioSectionIndex === -1) {
+        lines.unshift('[platformio]', `${key} = ${value}`, '');
+      } else {
+        // Look for existing key in platformio section
+        for (let i = platformioSectionIndex + 1; i < lines.length; i++) {
+          const line = lines[i].trim();
+          if (line.startsWith('[') && line.endsWith(']')) {
+            // Reached next section
+            break;
+          }
+          if (line.startsWith(`${key} =`)) {
+            keyIndex = i;
+            break;
+          }
+        }
+        
+        if (keyIndex !== -1) {
+          // Update existing key
+          lines[keyIndex] = `${key} = ${value}`;
+        } else {
+          // Add new key after [platformio] line
+          lines.splice(platformioSectionIndex + 1, 0, `${key} = ${value}`);
+        }
+      }
+      
+      fs.writeFileSync(configPath, lines.join('\n'));
+    } catch (err) {
+      console.error('Failed to update platformio.ini:', err);
+      vscode.window.showErrorMessage('Failed to update platformio.ini configuration');
+    }
   }
 }

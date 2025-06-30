@@ -12,7 +12,18 @@ export const IS_LINUX = !IS_WINDOWS && !IS_OSX;
 export const PIO_CORE_VERSION_SPEC = '>=6.1.6';
 export const STATUS_BAR_PRIORITY_START = 10;
 export const CONFLICTED_EXTENSION_IDS = [
-  'llvm-vs-code-extensions.vscode-clangd',
   'vsciot-vscode.vscode-arduino',
   'vscode-openapi',
+];
+
+export const REQUIRED_EXTENSION_IDS = [
+  'llvm-vs-code-extensions.vscode-clangd',
+  'ms-vscode.cmake-tools',
+  'vadimcn.vscode-lldb',
+];
+
+// C++ Toolchain Extensions (one should be active)
+export const CPP_TOOLCHAIN_EXTENSIONS = [
+  'ms-vscode.cpptools',
+  'anysphere.cpptools',
 ];
