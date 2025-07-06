@@ -7,7 +7,7 @@
 ## 3.3.3 (2024-01-26)
 
 * Implemented automatic upgrading of outdated portable Python 3.9 distributions to the latest version, Python 3.11, enhancing the development environment with the latest features and improvements
-* Updated the PlatformIO Core Installer Script to version [1.2.2](https://github.com/platformio/platformio-core-installer/releases/tag/v1.2.2)
+* Updated the PlatformIO Core Installer Script to version [1.2.2](https://github.com/omd0/platformio-core-installer/releases/tag/v1.2.2)
 
 ## 3.3.2 (2023-12-23)
 
@@ -15,39 +15,39 @@
 
 ## 3.3.1 (2023-07-28)
 
-* Updated the PlatformIO Core Installer Script to version [1.2.1](https://github.com/platformio/platformio-core-installer/releases/tag/v1.2.1)
+* Updated the PlatformIO Core Installer Script to version [1.2.1](https://github.com/omd0/platformio-core-installer/releases/tag/v1.2.1)
 
 ## 3.3.0 (2023-07-10)
 
 * Enhanced the user experience in the "Project Tasks" explorer by displaying tasks specific to the selected environment by default
 * Introduced a new option that allows seamless switching between multi-environment project tasks
 * Expanded the functionality of the "Activity Bar > PlatformIO IDE > Quick Access" menu by including a new item called [Serial & UDP Plotter](https://marketplace.visualstudio.com/items?itemName=alexnesnes.teleplot)
-* Updated the PlatformIO Core Installer Script to version [1.2.0](https://github.com/platformio/platformio-core-installer/releases/tag/v1.2.0)
+* Updated the PlatformIO Core Installer Script to version [1.2.0](https://github.com/omd0/platformio-core-installer/releases/tag/v1.2.0)
 
-![Toggle between Multi Environment Project Tasks](https://raw.githubusercontent.com/platformio/platformio-vscode-ide/develop/.github/media/platformio-toggle-multienv-tasks.gif)
+![Toggle between Multi Environment Project Tasks](https://raw.githubusercontent.com/omd0/platformio-vscode-ide/develop/.github/media/platformio-toggle-multienv-tasks.gif)
 
 ## 3.2.0 (2023-06-09)
 
-* Introducing a powerful linting feature that highlights syntactical and stylistic issues in the ["platformio.ini"](https://docs.platformio.org/en/latest/projectconf/index.html) configuration file (issue [#3723](https://github.com/platformio/platformio-vscode-ide/issues/3723))
+* Introducing a powerful linting feature that highlights syntactical and stylistic issues in the ["platformio.ini"](https://docs.platformio.org/en/latest/projectconf/index.html) configuration file (issue [#3723](https://github.com/omd0/platformio-vscode-ide/issues/3723))
 * Improved project cleanup process by utilizing the ``fullclean`` target instead of ``cleanall``. This ensures a thorough clean-up, including the removal of dependent libraries
-* Updated PlatformIO Core Installer Script to [v1.1.3](https://github.com/platformio/platformio-core-installer/releases/tag/v1.1.3)
-* Resolved an issue where certain buttons were missing from the status bar in VSCode 1.79 after the recent update (issue [#3736](https://github.com/platformio/platformio-vscode-ide/issues/3736))
+* Updated PlatformIO Core Installer Script to [v1.1.3](https://github.com/omd0/platformio-core-installer/releases/tag/v1.1.3)
+* Resolved an issue where certain buttons were missing from the status bar in VSCode 1.79 after the recent update (issue [#3736](https://github.com/omd0/platformio-vscode-ide/issues/3736))
 
-![Linting "platformio.ini" configuration file (demo)](https://raw.githubusercontent.com/platformio/platformio-vscode-ide/develop/.github/media/platformio-ini-lint-demo.png)
+![Linting "platformio.ini" configuration file (demo)](https://raw.githubusercontent.com/omd0/platformio-vscode-ide/develop/.github/media/platformio-ini-lint-demo.png)
 
 ## 3.1.1 (2023-03-16)
 
 * Added a new ``platformio-ide.uploadAndMonitor`` command which can be used with the custom [PlatformIO Toolbar](https://docs.platformio.org/en/latest/integration/ide/vscode.html#platformio-toolbar)
-* Restored support for macOS Touch Bar (issue [#3659](https://github.com/platformio/platformio-vscode-ide/issues/3659))
-* Fixed a regression bug that caused notifications about a task being "already active" when running the same "device monitor" (issue [#3656](https://github.com/platformio/platformio-vscode-ide/issues/3656))
+* Restored support for macOS Touch Bar (issue [#3659](https://github.com/omd0/platformio-vscode-ide/issues/3659))
+* Fixed a regression bug that caused notifications about a task being "already active" when running the same "device monitor" (issue [#3656](https://github.com/omd0/platformio-vscode-ide/issues/3656))
 
 ## 3.1.0 (2023-03-13)
 
-* Add support for the ``${command:platformio-ide.activeEnvironment}`` variable that can be used in a custom [PlatformIO Toolbar](https://docs.platformio.org/en/latest/integration/ide/vscode.html#platformio-toolbar) and [VSCode variable substitution](https://code.visualstudio.com/docs/editor/variables-reference) (issue [#3588](https://github.com/platformio/platformio-vscode-ide/issues/3588))
-* Focus on the project configuration output tab only on error (issue [#3535](https://github.com/platformio/platformio-vscode-ide/issues/3535))
-* Fixed an issue with a task runner on Windows 7 (issue [#3481](https://github.com/platformio/platformio-vscode-ide/issues/3481))
-* Fixed "Select All", "Undo", and "Redo" operations on macOS for PIO Home (pull [#3451](https://github.com/platformio/platformio-vscode-ide/pull/3451))
-* Fixed an issue when the "Upload & Monitor" task selects the wrong environment (issue [#2623](https://github.com/platformio/platformio-vscode-ide/issues/2623))
+* Add support for the ``${command:platformio-ide.activeEnvironment}`` variable that can be used in a custom [PlatformIO Toolbar](https://docs.platformio.org/en/latest/integration/ide/vscode.html#platformio-toolbar) and [VSCode variable substitution](https://code.visualstudio.com/docs/editor/variables-reference) (issue [#3588](https://github.com/omd0/platformio-vscode-ide/issues/3588))
+* Focus on the project configuration output tab only on error (issue [#3535](https://github.com/omd0/platformio-vscode-ide/issues/3535))
+* Fixed an issue with a task runner on Windows 7 (issue [#3481](https://github.com/omd0/platformio-vscode-ide/issues/3481))
+* Fixed "Select All", "Undo", and "Redo" operations on macOS for PIO Home (pull [#3451](https://github.com/omd0/platformio-vscode-ide/pull/3451))
+* Fixed an issue when the "Upload & Monitor" task selects the wrong environment (issue [#2623](https://github.com/omd0/platformio-vscode-ide/issues/2623))
 
 ## 3.0.0 (2023-02-01)
 

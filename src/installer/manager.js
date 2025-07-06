@@ -21,6 +21,10 @@ export default class InstallationManager {
 
   constructor(disableAutoUpdates = false) {
     const config = vscode.workspace.getConfiguration('platformio-ide');
+    
+    // Set environment variable to use custom core repository
+    process.env.PLATFORMIO_CORE_REPOSITORY = 'https://github.com/omd0/platformio-core';
+    
     this.stages = [
       new pioNodeHelpers.installer.PlatformIOCoreStage(
         {
@@ -33,7 +37,7 @@ export default class InstallationManager {
           useBuiltinPython: config.get('useBuiltinPython'),
           useBuiltinPIOCore: config.get('useBuiltinPIOCore'),
           useDevelopmentPIOCore: config.get('useDevelopmentPIOCore'),
-          customPIOCoreRepository: config.get('customPIOCoreRepository'),
+
           pythonPrompt: new PythonPrompt(),
           disableAutoUpdates: disableAutoUpdates,
           predownloadedPackageDir: path.join(

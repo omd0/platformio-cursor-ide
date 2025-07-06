@@ -101,13 +101,6 @@ class PlatformIOVSCodeExtension {
     misc.maybeRateExtension();
     misc.checkRequiredExtensions();
     misc.warnAboutConflictedExtensions();
-    
-    // Setup C++ toolchain based on platformio.ini configuration
-    if (extension.getConfiguration('autoSetupCppToolchain')) {
-      // This will be called after project manager determines the toolchain
-      // For now, use default - project manager will handle the specific toolchain
-      misc.handleCppToolchainSetup();
-    }
     this.subscriptions.push(
       vscode.window.onDidChangeActiveTextEditor((editor) =>
         misc.warnAboutInoFile(editor),
@@ -276,29 +269,6 @@ class PlatformIOVSCodeExtension {
       vscode.commands.registerCommand('platformio-ide.upgradeCore', () =>
         this.pioTerm.sendText('pio upgrade'),
       ),
-      vscode.commands.registerCommand('platformio-ide.setCustomPIOCoreRepository', async () => {
-        const currentRepo = this.getConfiguration('customPIOCoreRepository');
-        const newRepo = await vscode.window.showInputBox({
-          prompt: 'Enter custom PlatformIO Core repository URL (or leave empty for official)',
-          placeHolder: 'https://github.com/yourusername/platformio-core.git#branch',
-          value: currentRepo || '',
-        });
-        
-        if (newRepo !== undefined) {
-          const config = vscode.workspace.getConfiguration('platformio-ide');
-          await config.update('customPIOCoreRepository', newRepo || null, vscode.ConfigurationTarget.Global);
-          
-          const repoDisplay = newRepo || 'official repository';
-          vscode.window.showInformationMessage(
-            `PlatformIO Core repository set to: ${repoDisplay}. Please restart VSCode to apply changes.`,
-            'Restart Now'
-          ).then((selection) => {
-            if (selection === 'Restart Now') {
-              vscode.commands.executeCommand('workbench.action.reloadWindow');
-            }
-          });
-        }
-      }),
     );
   }
 
@@ -307,19 +277,27 @@ class PlatformIOVSCodeExtension {
   }
 
   handleUseDevelopmentPIOCoreConfiguration() {
-    const config = vscode.workspace.getConfiguration('platformio-ide');
-    return config.onDidChange(async (event) => {
-      if (!event.affectsConfiguration('platformio-ide.useDevelopmentPIOCore') && 
-          !event.affectsConfiguration('platformio-ide.customPIOCoreRepository')) {
+    return vscode.workspace.onDidChangeConfiguration(async (e) => {
+      if (
+        !e.affectsConfiguration('platformio-ide.useDevelopmentPIOCore') ||
+        !this.getConfiguration('useBuiltinPIOCore')
+      ) {
         return;
       }
-      const selected = await vscode.window.showInformationMessage(
-        'Please restart VSCode to apply the new PlatformIO Core configuration.',
-        'Restart Now',
-      );
-      if (selected === 'Restart Now') {
-        vscode.commands.executeCommand('workbench.action.reloadWindow');
+      const envDir = pioNodeHelpers.core.getEnvDir();
+      if (!envDir || !fs.isDirectorySync(envDir)) {
+        return;
       }
+      await PIOHome.shutdownAllServers();
+      await pioNodeHelpers.misc.sleep(2000);
+      try {
+        fs.removeSync(envDir);
+      } catch (err) {
+        console.warn(err);
+      }
+      vscode.window.showInformationMessage(
+        'Please restart VSCode to apply the changes.',
+      );
     });
   }
 

@@ -29,11 +29,11 @@
     "name": "PlatformIO Labs"
   },
   "bugs": {
-    "url": "https://github.com/platformio/platformio-vscode-ide/issues"
+    "url": "https://github.com/omd0/platformio-cursor-ide/issues"
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/platformio/platformio-vscode-ide.git"
+    "url": "https://github.com/omd0/platformio-cursor-ide.git"
   },
   "activationEvents": [
     "workspaceContains:**/platformio.ini"
@@ -191,19 +191,15 @@
       },
       {
         "command": "platformio-ide.rebuildProjectIndex",
-        "title": "Rebuild IntelliSense Index",
+        "title": "Generate compile_commands.json for clangd",
         "category": "PlatformIO",
         "enablement": "pioProjectTasksReady"
       },
       {
-        "command": "platformio-ide.switchCppToolchain",
-        "title": "Switch C++ Toolchain",
-        "category": "PlatformIO"
-      },
-      {
-        "command": "platformio-ide.setCustomPIOCoreRepository",
-        "title": "Set Custom PlatformIO Core Repository",
-        "category": "PlatformIO"
+        "command": "platformio-ide.rebuildClangdIndex",
+        "title": "Rebuild clangd Index",
+        "category": "PlatformIO",
+        "enablement": "pioProjectTasksReady"
       },
       {
         "command": "platformio-ide.startDebugging",
@@ -729,12 +725,7 @@
         "platformio-ide.autoRebuildAutocompleteIndex": {
           "type": "boolean",
           "default": true,
-          "description": "Automatically rebuild the project IntelliSense index when platformio.ini is changed or when new libraries are installed"
-        },
-        "platformio-ide.autoSetupCppToolchain": {
-          "type": "boolean",
-          "default": true,
-          "description": "Automatically setup C++ IntelliSense based on platformio.ini configuration"
+          "description": "Automatically generate compile_commands.json for clangd IntelliSense when platformio.ini is changed or when new libraries are installed"
         },
         "platformio-ide.showEditorTitleShortcuts": {
           "type": "boolean",
@@ -775,14 +766,7 @@
           "default": false,
           "description": "Use a development version of PlatformIO Core"
         },
-        "platformio-ide.customPIOCoreRepository": {
-          "type": [
-            "string",
-            "null"
-          ],
-          "default": null,
-          "description": "Custom Git repository URL for PlatformIO Core (e.g., 'https://github.com/yourusername/platformio-core.git#branch'). Leave empty to use the official repository."
-        },
+
         "platformio-ide.disablePIOHomeStartup": {
           "type": "boolean",
           "default": false,

@@ -17,10 +17,9 @@ import { STATUS_BAR_PRIORITY_START } from '../constants';
 import { extension } from '../main';
 import path from 'path';
 import vscode from 'vscode';
-import fs from 'fs';
 
 export default class ProjectManager {
-  CONFIG_CHANGED_DELAY = 3; // seconds
+  CONFIG_CHANGED_DELAY = 1; // seconds - reduced for faster response
 
   constructor() {
     this._taskManager = undefined;
@@ -76,10 +75,13 @@ export default class ProjectManager {
             this._configChangedTimeout = undefined;
           }
           this._configChangedTimeout = setTimeout(
-            () =>
+            () => {
               this.switchToProject(projectDir, {
                 force: true,
-              }),
+              });
+              // Always rebuild clangd index when platformio.ini changes
+              this.rebuildClangdIndex();
+            },
             ProjectManager.CONFIG_CHANGED_DELAY * 1000,
           );
         },
@@ -95,6 +97,26 @@ export default class ProjectManager {
       this._pool,
       this._logOutputChannel,
       this._configProvider,
+      // Direct watcher for platformio.ini files to ensure we catch all changes
+      vscode.workspace.createFileSystemWatcher('**/platformio.ini').onDidChange((uri) => {
+        console.log('platformio.ini changed:', uri.fsPath);
+        const projectDir = path.dirname(uri.fsPath);
+        if (this._configChangedTimeout) {
+          clearTimeout(this._configChangedTimeout);
+          this._configChangedTimeout = undefined;
+        }
+        this._configChangedTimeout = setTimeout(
+          () => {
+            console.log('Triggering clangd rebuild for platformio.ini change');
+            this.switchToProject(projectDir, {
+              force: true,
+            });
+            // Always rebuild clangd index when platformio.ini changes
+            this.rebuildClangdIndex();
+          },
+          ProjectManager.CONFIG_CHANGED_DELAY * 1000,
+        );
+      }),
       vscode.window.onDidChangeActiveTextEditor(() => {
         if (!extension.getConfiguration('activateProjectOnTextEditorChange')) {
           return;
@@ -102,13 +124,24 @@ export default class ProjectManager {
         const projectDir = projectHelpers.getActiveEditorProjectDir();
         if (projectDir) {
           this.switchToProject(projectDir);
+          // Initialize clangd support when switching projects via text editor
+          setTimeout(() => {
+            this.rebuildClangdIndex();
+          }, 1000);
         }
       }),
-      vscode.workspace.onDidChangeWorkspaceFolders(() =>
-        this.switchToProject(this.findActiveProjectDir()),
-      ),
+      vscode.workspace.onDidChangeWorkspaceFolders(() => {
+        this.switchToProject(this.findActiveProjectDir());
+        // Initialize clangd support when workspace folders change
+        setTimeout(() => {
+          this.rebuildClangdIndex();
+        }, 1000);
+      }),
       vscode.commands.registerCommand('platformio-ide.rebuildProjectIndex', () =>
-        this._pool.getActiveObserver().rebuildIndex({ force: true }),
+        this.rebuildClangdIndex(),
+      ),
+      vscode.commands.registerCommand('platformio-ide.rebuildClangdIndex', () =>
+        this.rebuildClangdIndex(),
       ),
       vscode.commands.registerCommand('platformio-ide.refreshProjectTasks', () =>
         this._taskManager.refresh({ force: true }),
@@ -123,16 +156,196 @@ export default class ProjectManager {
         'platformio-ide.activeEnvironment',
         async () => await this._pool.getActiveObserver().revealActiveEnvironment(),
       ),
-      vscode.commands.registerCommand(
-        'platformio-ide.switchCppToolchain',
-        async () => await this.switchCppToolchain(),
-      ),
     ];
     this.internalSubscriptions = [];
 
     this.registerEnvSwitcher();
     // switch to the first project in a workspace on start-up
     this.switchToProject(this.findActiveProjectDir(), { force: true });
+    
+    // Initialize clangd support for the first project after a delay
+    setTimeout(() => {
+      this.rebuildClangdIndex();
+    }, 2000);
+  }
+
+  async rebuildClangdIndex() {
+    console.log('rebuildClangdIndex called');
+    try {
+      const observer = this._pool.getActiveObserver();
+      if (!observer) {
+        console.log('No active observer found');
+        vscode.window.showErrorMessage('No active PlatformIO project found.');
+        return;
+      }
+      console.log('Active project:', observer.projectDir);
+
+      await vscode.window.withProgress(
+        {
+          location: vscode.ProgressLocation.Notification,
+          title: 'PlatformIO: Initializing clangd and generating compile_commands.json',
+          cancellable: true,
+        },
+        async (progress, token) => {
+          progress.report({ message: 'Initializing project with clangd support...', increment: 0 });
+
+          try {
+            // Get the currently selected environment
+            const selectedEnv = observer.getSelectedEnv();
+            const envArgs = selectedEnv ? ['-e', selectedEnv] : [];
+            
+            console.log('Project directory:', observer.projectDir);
+            console.log('Selected environment:', selectedEnv);
+            console.log('Environment args:', envArgs);
+
+            // Use background execution with proper PATH setup
+            console.log('Running clangd setup in background...');
+            
+            const { spawn } = require('child_process');
+            const { promisify } = require('util');
+            const exec = promisify(require('child_process').exec);
+            
+            // Get PlatformIO Core path and add to PATH
+            const pioCorePath = await pioNodeHelpers.core.getCoreDir();
+            const platformioPath = path.join(pioCorePath, 'penv', 'bin');
+            const platformioScriptsPath = path.join(pioCorePath, 'penv', 'Scripts');
+            
+            console.log('PlatformIO Core path:', pioCorePath);
+            console.log('PlatformIO bin path:', platformioPath);
+            
+            // Create environment with PlatformIO in PATH
+            const env = {
+              ...process.env,
+              PATH: `${platformioPath}${path.delimiter}${platformioScriptsPath}${path.delimiter}${process.env.PATH}`,
+              PLATFORMIO_HOME_DIR: pioCorePath,
+            };
+            
+            console.log('Running: pio init --ide clangd', envArgs);
+            
+            // Step 1: Run pio init --ide clangd
+            const initProcess = spawn('pio', ['init', '--ide', 'clangd', ...envArgs], {
+              cwd: observer.projectDir,
+              env: env,
+              stdio: ['pipe', 'pipe', 'pipe']
+            });
+            
+            await new Promise((resolve, reject) => {
+              let initOutput = '';
+              let initError = '';
+              
+              initProcess.stdout.on('data', (data) => {
+                initOutput += data.toString();
+                console.log('Init stdout:', data.toString());
+              });
+              
+              initProcess.stderr.on('data', (data) => {
+                initError += data.toString();
+                console.log('Init stderr:', data.toString());
+              });
+              
+              initProcess.on('close', (code) => {
+                console.log('Init process exited with code:', code);
+                if (code === 0) {
+                  resolve();
+                } else {
+                  reject(new Error(`pio init failed with code ${code}: ${initError}`));
+                }
+              });
+            });
+            
+            progress.report({ message: 'Generating compilation database...', increment: 50 });
+            
+            console.log('Running: pio run -t compiledb', envArgs);
+            
+            // Step 2: Run pio run -t compiledb
+            const compiledbProcess = spawn('pio', ['run', '-t', 'compiledb', ...envArgs], {
+              cwd: observer.projectDir,
+              env: env,
+              stdio: ['pipe', 'pipe', 'pipe']
+            });
+            
+            await new Promise((resolve, reject) => {
+              let compiledbOutput = '';
+              let compiledbError = '';
+              
+              compiledbProcess.stdout.on('data', (data) => {
+                compiledbOutput += data.toString();
+                console.log('Compiledb stdout:', data.toString());
+              });
+              
+              compiledbProcess.stderr.on('data', (data) => {
+                compiledbError += data.toString();
+                console.log('Compiledb stderr:', data.toString());
+              });
+              
+              compiledbProcess.on('close', (code) => {
+                console.log('Compiledb process exited with code:', code);
+                if (code === 0) {
+                  resolve();
+                } else {
+                  reject(new Error(`pio run -t compiledb failed with code ${code}: ${compiledbError}`));
+                }
+              });
+            });
+
+            const fs = require('fs');
+            const clangdPath = path.join(observer.projectDir, '.clangd');
+            const compiledbPath = path.join(observer.projectDir, 'compile_commands.json');
+            
+            console.log('Checking for .clangd file:', clangdPath);
+            console.log('Checking for compile_commands.json:', compiledbPath);
+            
+            const clangdExists = fs.existsSync(clangdPath);
+            const compiledbExists = fs.existsSync(compiledbPath);
+            
+            console.log('.clangd exists:', clangdExists);
+            console.log('compile_commands.json exists:', compiledbExists);
+            
+            if (!clangdExists || !compiledbExists) {
+              console.log('Files still not found, showing terminal for manual execution...');
+              vscode.window.showWarningMessage(
+                'Clangd setup commands sent to terminal. Please check the terminal for any errors and run manually if needed.'
+              );
+            }
+
+            progress.report({ message: 'Compilation database generated successfully!', increment: 100 });
+            
+            // Restart clangd server to pick up new compilation database
+            console.log('Restarting clangd server...');
+            try {
+              // Try multiple clangd restart commands for different extensions
+              await vscode.commands.executeCommand('clangd.restart');
+              console.log('clangd.restart command executed successfully');
+            } catch (err) {
+              console.log('clangd.restart not available, trying alternative commands...');
+              try {
+                await vscode.commands.executeCommand('clangd.restartLanguageServer');
+                console.log('clangd.restartLanguageServer command executed successfully');
+              } catch (err2) {
+                console.log('clangd.restartLanguageServer not available, trying clangd.reload...');
+                try {
+                  await vscode.commands.executeCommand('clangd.reload');
+                  console.log('clangd.reload command executed successfully');
+                } catch (err3) {
+                  console.log('No clangd restart commands available');
+                }
+              }
+            }
+
+            vscode.window.showInformationMessage(
+              `PlatformIO: Project initialized with clangd support and compile_commands.json generated${selectedEnv ? ` (env: ${selectedEnv})` : ''}. Clangd server restarted.`
+            );
+          } catch (err) {
+            throw new Error(`Failed to initialize clangd support: ${err.message}`);
+          }
+        }
+      );
+    } catch (err) {
+      console.error('rebuildClangdIndex error:', err);
+      vscode.window.showErrorMessage(
+        `Failed to initialize clangd support: ${err.message}`
+      );
+    }
   }
 
   dispose() {
@@ -238,6 +451,12 @@ export default class ProjectManager {
         new ProjectTestManager(projectDir),
       );
 
+      // Always rebuild clangd index when environment changes to update toolchain paths
+      // Small delay to ensure the environment switch is complete
+      setTimeout(() => {
+        this.rebuildClangdIndex();
+      }, 1000);
+
       // open "platformio.ini" if no visible editors
       if (
         vscode.window.visibleTextEditors.length === 0 &&
@@ -318,97 +537,5 @@ export default class ProjectManager {
       return;
     }
     this.switchToProject(pickedItem.projectDir, { env: pickedItem.env, force: true });
-  }
-
-  async switchCppToolchain() {
-    const toolchains = [
-      { 
-        label: 'Microsoft C/C++ Tools', 
-        value: 'ms-vscode.cpptools',
-        description: 'Traditional Microsoft C++ extension'
-      },
-      { 
-        label: 'anysphere C++ Tools', 
-        value: 'anysphere.cpptools',
-        description: 'Modern C++ language server'
-      }
-    ];
-    
-    const selected = await vscode.window.showQuickPick(toolchains, {
-      placeHolder: 'Select C++ toolchain for IntelliSense'
-    });
-
-    if (selected) {
-      const activeProjectDir = this.findActiveProjectDir();
-      if (!activeProjectDir) {
-        vscode.window.showErrorMessage('No active PlatformIO project found');
-        return;
-      }
-
-      // Update platformio.ini with selected toolchain
-      await this.updatePlatformIOConfig(activeProjectDir, 'vscode_cpp_toolchain', selected.value);
-      
-      // Setup the selected toolchain
-      const misc = await import('../misc.js');
-      await misc.handleCppToolchainSetup(selected.value);
-      
-      // Trigger project reconfiguration
-      await this.switchToProject(activeProjectDir, { force: true });
-      
-      vscode.window.showInformationMessage(
-        `Switched to ${selected.label}. Project configuration updated.`
-      );
-    }
-  }
-
-  async updatePlatformIOConfig(projectDir, key, value) {
-    const configPath = path.join(projectDir, 'platformio.ini');
-    try {
-      let content = fs.readFileSync(configPath, 'utf8');
-      
-      // Simple approach: look for [platformio] section and add/update the key
-      const lines = content.split('\n');
-      let platformioSectionIndex = -1;
-      let keyIndex = -1;
-      
-      // Find [platformio] section
-      for (let i = 0; i < lines.length; i++) {
-        if (lines[i].trim() === '[platformio]') {
-          platformioSectionIndex = i;
-          break;
-        }
-      }
-      
-      // If no [platformio] section, add it at the beginning
-      if (platformioSectionIndex === -1) {
-        lines.unshift('[platformio]', `${key} = ${value}`, '');
-      } else {
-        // Look for existing key in platformio section
-        for (let i = platformioSectionIndex + 1; i < lines.length; i++) {
-          const line = lines[i].trim();
-          if (line.startsWith('[') && line.endsWith(']')) {
-            // Reached next section
-            break;
-          }
-          if (line.startsWith(`${key} =`)) {
-            keyIndex = i;
-            break;
-          }
-        }
-        
-        if (keyIndex !== -1) {
-          // Update existing key
-          lines[keyIndex] = `${key} = ${value}`;
-        } else {
-          // Add new key after [platformio] line
-          lines.splice(platformioSectionIndex + 1, 0, `${key} = ${value}`);
-        }
-      }
-      
-      fs.writeFileSync(configPath, lines.join('\n'));
-    } catch (err) {
-      console.error('Failed to update platformio.ini:', err);
-      vscode.window.showErrorMessage('Failed to update platformio.ini configuration');
-    }
   }
 }

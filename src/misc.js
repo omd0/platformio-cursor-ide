@@ -6,7 +6,7 @@
  * the root directory of this source tree.
  */
 
-import { CONFLICTED_EXTENSION_IDS, REQUIRED_EXTENSION_IDS, CPP_TOOLCHAIN_EXTENSIONS } from './constants';
+import { CONFLICTED_EXTENSION_IDS, REQUIRED_EXTENSION_IDS } from './constants';
 import { extension } from './main';
 import vscode from 'vscode';
 
@@ -87,59 +87,6 @@ export async function checkRequiredExtensions() {
         vscode.Uri.parse('https://docs.platformio.org/en/latest/integration/ide/vscode.html#modern-toolchain'),
       );
       break;
-  }
-}
-
-export async function handleCppToolchainSetup(toolchain = 'ms-vscode.cpptools') {
-  // Recommend appropriate extension
-  const targetExtension = toolchain;
-  const extension = vscode.extensions.getExtension(targetExtension);
-  
-  if (!extension) {
-    const displayName = toolchain === 'anysphere.cpptools' ? 'anysphere C++ Tools' : 'Microsoft C/C++ Tools';
-    const action = await vscode.window.showInformationMessage(
-      `${displayName} extension is required for C++ IntelliSense. Install it?`,
-      'Install', 'Later'
-    );
-
-    if (action === 'Install') {
-      await vscode.commands.executeCommand(
-        'workbench.extensions.installExtension', 
-        targetExtension
-      );
-      vscode.commands.executeCommand('workbench.action.reloadWindow');
-    }
-    return;
-  }
-
-  // Handle conflicting extensions - warn if multiple C++ extensions are active
-  const activeCppExtensions = CPP_TOOLCHAIN_EXTENSIONS.filter(
-    (id) => {
-      const ext = vscode.extensions.getExtension(id);
-      return ext && ext.isActive;
-    }
-  );
-
-  if (activeCppExtensions.length > 1) {
-    const conflictingExtensions = activeCppExtensions.filter(id => id !== toolchain);
-    
-    if (conflictingExtensions.length > 0) {
-      const action = await vscode.window.showWarningMessage(
-        `Multiple C++ extensions are active (${activeCppExtensions.join(', ')}). ` +
-          `This may cause conflicts. Disable ${conflictingExtensions.join(', ')}?`,
-        'Disable Others', 'Keep All'
-      );
-
-      if (action === 'Disable Others') {
-        for (const conflictingId of conflictingExtensions) {
-          await vscode.commands.executeCommand(
-            'workbench.extensions.disableWorkspace', 
-            conflictingId
-          );
-        }
-        vscode.commands.executeCommand('workbench.action.reloadWindow');
-      }
-    }
   }
 }
 
